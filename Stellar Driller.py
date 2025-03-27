@@ -11,11 +11,10 @@ class TipoMineral(Enum):
 
 
 class Mineral:
-    def __init__(self, nome, tipo, valor, icon):
+    def __init__(self, nome, valor, icon):  # Remova o parâmetro 'tipo'
         self.nome = nome
-        self.tipo = tipo
         self.valor = valor
-        self.icon = icon
+        self.icon = icon  # Note que está 'icon' (sem 'e' no final)
 
 
 class Planeta:
@@ -36,9 +35,7 @@ class Planeta:
 
         # Aplica efeito de evento
         if self.evento_ativo == "Tempestade de areia":
-            base_minerado = int(base_minerado * 0.7)
-        elif self.evento_ativo == "Distorção temporal":
-            base_minerado = base_minerado * 2
+            base_minerado = int(base_minerado * 0.7)  # Redução de 30% na mineração
 
         minerado = min(base_minerado, self.riqueza[mineral_alvo.nome])
         self.riqueza[mineral_alvo.nome] -= minerado
@@ -60,47 +57,44 @@ class Planeta:
 
 
 class Mochila:
-    def __init__(self, capacidade=50):
+    def __init__(self, capacidade=500):
         self.capacidade = capacidade
-        self.conteudo = {}
+        self.conteudo = {}  # {nome_mineral: quantidade}
         self.creditos_estimados = 0
 
     def adicionar_mineral(self, mineral, quantidade):
-        if self.espaco_disponivel() >= quantidade:
-            if mineral.nome in self.conteudo:
-                self.conteudo[mineral.nome] += quantidade
-            else:
-                self.conteudo[mineral.nome] = quantidade
+        """Adiciona mineral à mochila, retorna True se bem sucedido"""
+        if isinstance(mineral, Mineral):  # Se for objeto Mineral, pega o nome
+            nome_mineral = mineral.nome
+        else:
+            nome_mineral = mineral
 
-            if mineral.tipo == TipoMineral.COMERCIAL:
-                self.creditos_estimados += quantidade * mineral.valor
+        total_itens = sum(self.conteudo.values()) + quantidade
+
+        if total_itens <= self.capacidade:
+            self.conteudo[nome_mineral] = self.conteudo.get(nome_mineral, 0) + quantidade
             return True
         return False
 
-    def remover_mineral(self, mineral_nome, quantidade):
-        if mineral_nome in self.conteudo and self.conteudo[mineral_nome] >= quantidade:
-            self.conteudo[mineral_nome] -= quantidade
+    def remover_mineral(self, mineral, quantidade):
+        """Remove mineral da mochila, retorna True se bem sucedido"""
+        nome_mineral = mineral.nome if isinstance(mineral, Mineral) else mineral
 
-            # Atualiza créditos estimados se for mineral comercial
-            for mineral in MINERAIS_DISPONIVEIS:
-                if mineral.nome == mineral_nome and mineral.tipo == TipoMineral.COMERCIAL:
-                    self.creditos_estimados -= quantidade * mineral.valor
-                    break
-
-            if self.conteudo[mineral_nome] == 0:
-                del self.conteudo[mineral_nome]
+        if nome_mineral in self.conteudo and self.conteudo[nome_mineral] >= quantidade:
+            self.conteudo[nome_mineral] -= quantidade
+            if self.conteudo[nome_mineral] <= 0:
+                del self.conteudo[nome_mineral]
             return True
         return False
-
-    def espaco_disponivel(self):
-        return self.capacidade - sum(self.conteudo.values())
 
     def calcular_valor_total(self):
+        """Calcula valor total de todos os minerais"""
         total = 0
-        for nome, qtd in self.conteudo.items():
-            mineral = next(m for m in MINERAIS_DISPONIVEIS if m.nome == nome)
-            if mineral.tipo == TipoMineral.COMERCIAL:
-                total += qtd * mineral.valor
+        for nome_mineral, qtd in self.conteudo.items():
+            mineral_obj = next((m for m in MINERAIS_DISPONIVEIS if m.nome == nome_mineral), None)
+            if mineral_obj:
+                total += qtd * mineral_obj.valor
+        self.creditos_estimados = total
         return total
 
 
@@ -124,14 +118,71 @@ class Nave:
             return True
         return False
 
-    def minerar(self, planeta, mineral):
-        custo = planeta.dificuldade * 0.5
-        if self.combustivel >= custo:
-            minerado = planeta.minerar(mineral)
-            if minerado > 0:
-                self.combustivel -= custo
-                return int(minerado * self.capacidade_mineracao)
-        return 0
+    def estacao_espacial(jogador):
+        print("\n*Docking na Estação Forja Estelar...*")
+        print("\"Salve, humano! Recarrego combustível por créditos. O que deseja?\"")
+
+        while True:
+            print(f"\n💰 Seus créditos: {jogador.creditos}")
+            print(
+                f"🔋 Combustível atual: {int(jogador.nave.combustivel)}/{jogador.nave.combustivel_max}")  # Conversão para inteiro
+            print("\n1. Recarregar 100% combustível (5000 créditos)")
+            print("2. Recarregar 20% combustível (1000 créditos)")
+            print("3. Sair da estação")
+
+            escolha = input("\nEscolha: ").strip()
+
+            if escolha == "1":
+                custo = 5000
+                if jogador.creditos >= custo:
+                    jogador.creditos -= custo
+                    jogador.nave.combustivel = jogador.nave.combustivel_max
+                    print(f"\n🔋 Combustível recarregado para 100%! (-{custo} créditos)")
+                    print(f"💰 Créditos restantes: {jogador.creditos}")
+                else:
+                    print(f"\n⚠️ Você precisa de {custo} créditos (você tem: {jogador.creditos})")
+                time.sleep(1.5)
+
+            elif escolha == "2":
+                custo = 1000
+                if jogador.creditos >= custo:
+                    jogador.creditos -= custo
+                    recarga = jogador.nave.combustivel_max * 0.2
+                    jogador.nave.combustivel = min(jogador.nave.combustivel + recarga,
+                                                   jogador.nave.combustivel_max)
+                    print(f"\n🔋 Combustível recarregado em 20%! (-{custo} créditos)")
+                    print(f"💰 Créditos restantes: {jogador.creditos}")
+                else:
+                    print(f"\n⚠️ Você precisa de {custo} créditos (você tem: {jogador.creditos})")
+                time.sleep(1.5)
+
+            elif escolha == "3":
+                print("\n*Desacoplando da estação...*")
+                time.sleep(1)
+                break
+
+            else:
+                print("\nOpção inválida!")
+                time.sleep(1)
+
+    def minerar(self, planeta, mineral_alvo):
+        """
+        Método simplificado de mineração sem consumo de combustível
+        Retorna a quantidade minerada ou 0 se falhar
+        """
+        # Verifica se o mineral existe e tem recursos disponíveis
+        if mineral_alvo.nome not in planeta.riqueza or planeta.riqueza[mineral_alvo.nome] <= 0:
+            print(f"⚠️ {mineral_alvo.nome} esgotado ou não encontrado neste planeta!")
+            return 0
+
+        # Calcula quantidade minerada (base aleatória + bônus da nave)
+        base_minerado = random.randint(3, 8)
+        quantidade = int(base_minerado * self.capacidade_mineracao)
+
+        # Atualiza os recursos do planeta
+        planeta.riqueza[mineral_alvo.nome] -= quantidade
+
+        return quantidade
 
     def reparar(self, quantidade):
         self.dano = max(0, self.dano - quantidade)
@@ -150,7 +201,8 @@ class Nave:
                             perdido = max(1, int(qtd * 0.1))
                             jogador.mochila.remover_mineral(mineral, perdido)
                             total_perdido += perdido
-                        return f"⚠️ ALERTA! Vazamento no traje. Perdidos {total_perdido} minérios técnicos!"
+                        return f"⚠️ ALERTA! Vazamento no traje. Perdidos {total_perdido} minérios!"
+                    return "⚠️ ALERTA! Vazamento no traje. (Sem minérios para perder)"
                 return "Traje espacial intacto (upgrade ativado)"
 
             elif evento == "Vazamento de O₂":
@@ -170,9 +222,9 @@ class Nave:
 
             elif evento == "Asteroide Próximo":
                 if self.upgrades.get("escudo_antimat", False):
-                    return "🛡️ Escudos deflectaram o asteroide!"
-                self.dano = min(self.dano + 20, 100)
-                return "💥 Asteroide atingiu a nave! -20% integridade"
+                    return "🛡️ Os escudos desviaram o asteroide!"
+                self.dano = min(self.dano + 50, 100)
+                return "💥 Asteroide atingiu a nave! -50% integridade"
 
             return f"Evento desconhecido: {evento}"
 
@@ -186,7 +238,7 @@ class Jogador:
         self.nome = nome
         self.nave = Nave()
         self.mochila = Mochila()
-        self.creditos = 5000  # Começa com mais créditos para testes
+        self.creditos = 5000
         self.experiencia = 0
         self.nivel = 1
         self.localizacao = "Via Láctea"
@@ -203,16 +255,52 @@ class Jogador:
         return False
 
     def vender_minerais(self):
-        total = self.mochila.calcular_valor_total()
-        minerais_vendidos = [m for m in self.mochila.conteudo.items()
-                             if next((min for min in MINERAIS_DISPONIVEIS
-                                      if min.nome == m[0] and min.tipo == TipoMineral.COMERCIAL), None)]
+        """Vende qualquer tipo de mineral"""
+        if not self.mochila.conteudo:
+            print("⚠️ Mochila vazia! Nada para vender.")
+            return 0
 
-        for mineral, qtd in minerais_vendidos:
-            self.mochila.remover_mineral(mineral, qtd)
+        print("\n📦 Minerais disponíveis para venda:")
+        minerais_disponiveis = list(self.mochila.conteudo.items())
 
-        self.creditos += total
-        return total
+        for i, (nome, qtd) in enumerate(minerais_disponiveis, 1):
+            mineral_obj = next((m for m in MINERAIS_DISPONIVEIS if m.nome == nome), None)
+            if mineral_obj:
+                valor = qtd * mineral_obj.valor
+                print(f"{i}. {mineral_obj.icon} {nome}: {qtd} unidades (Valor: {valor} créditos)")
+            else:
+                print(f"{i}. ❓ {nome}: {qtd} unidades (Valor desconhecido)")
+
+        try:
+            opcao = int(input("Escolha o mineral para vender (0 para cancelar): ")) - 1
+            if opcao == -1:
+                return 0
+
+            if 0 <= opcao < len(minerais_disponiveis):
+                nome_mineral, qtd_disponivel = minerais_disponiveis[opcao]
+                qtd_vender = int(input(f"Quantidade de {nome_mineral} para vender (max {qtd_disponivel}): "))
+
+                if 0 < qtd_vender <= qtd_disponivel:
+                    mineral_obj = next((m for m in MINERAIS_DISPONIVEIS if m.nome == nome_mineral), None)
+                    if mineral_obj:
+                        valor = qtd_vender * mineral_obj.valor
+                        if self.mochila.remover_mineral(nome_mineral, qtd_vender):
+                            self.creditos += valor
+                            print(f"💰 Vendido {qtd_vender} de {nome_mineral} por {valor} créditos!")
+                            return valor
+                        else:
+                            print("⚠️ Erro ao vender mineral!")
+                    else:
+                        print(f"⚠️ Valor de mercado desconhecido para {nome_mineral}!")
+                else:
+                    print("⚠️ Quantidade inválida!")
+            else:
+                print("⚠️ Opção inválida!")
+        except ValueError:
+            print("⚠️ Por favor, digite um número válido!")
+
+        time.sleep(1)
+        return 0
 
     def comprar_upgrade(self, upgrade):
         requisitos = UPGRADES_DISPONIVEIS[upgrade]
@@ -249,16 +337,16 @@ class Jogador:
 
 # Definição de minerais disponíveis
 MINERAIS_DISPONIVEIS = [
-    Mineral("Ferro", TipoMineral.COMERCIAL, 10, "💰"),
-    Mineral("Silício", TipoMineral.TECNICO, 0, "🔧"),
-    Mineral("Titânio", TipoMineral.COMERCIAL, 25, "💰"),
-    Mineral("Hélio-3", TipoMineral.TECNICO, 0, "🚀"),
-    Mineral("Ouro", TipoMineral.COMERCIAL, 50, "💰"),
-    Mineral("Cobre", TipoMineral.TECNICO, 0, "🔧"),
-    Mineral("Platina", TipoMineral.COMERCIAL, 100, "💰"),
-    Mineral("Iridício", TipoMineral.TECNICO, 0, "🛡️"),
-    Mineral("Dark Matter", TipoMineral.COMERCIAL, 300, "💰"),
-    Mineral("Antimatéria", TipoMineral.TECNICO, 0, "💥")
+    Mineral("Ferro", 35, "🔩"),
+    Mineral("Silício", 40, "🔧"),
+    Mineral("Titânio", 50, "💠"),
+    Mineral("Hélio-3", 80, "⚡"),
+    Mineral("Ouro", 150, "💰"),
+    Mineral("Cobre", 30, "🔶"),
+    Mineral("Platina", 200, "🔷"),
+    Mineral("Iridício", 300, "🛡️"),
+    Mineral("Matéria escura", 500, "⚫"),
+    Mineral("Antimatéria", 750, "💥")
 ]
 
 # Definição de upgrades
@@ -277,7 +365,7 @@ UPGRADES_DISPONIVEIS = {
         "descricao": "Protege contra asteroides e reduz danos em 50%"
     },
     "traje_avancado": {
-        "nome_exibicao": "👨‍🚀 Traje Espacial Mk-II",
+        "nome_exibicao": "👨‍🚀 Traje Espacial",
         "creditos": 8000,
         "recursos": {"Titânio": 20, "Cobre": 15},
         "descricao": "Previne perda de minérios em eventos de falha no traje"
@@ -287,21 +375,21 @@ UPGRADES_DISPONIVEIS = {
 # Definição de planetas
 PLANETAS_VIA_LACTEA = [
     Planeta(
-        "Terra-616",
+        "Terra-10005",
         [next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Ferro"),
          next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Silício")],
         10,
         ["Falha no Traje"]  # Evento único
     ),
     Planeta(
-        "Luna-3",
+        "Luna",
         [next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Titânio"),
          next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Hélio-3")],
         15,
         ["Vazamento de O₂"]  # Evento único
     ),
     Planeta(
-        "Marte Vermelho",
+        "Planeta Vermelho",
         [next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Ouro"),
          next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Cobre")],
         20,
@@ -319,10 +407,10 @@ PLANETAS_VIA_LACTEA = [
 PLANETAS_INTERGALACTICOS = [
     Planeta(
         "Andrômeda Prime",
-        [next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Dark Matter"),
+        [next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Matéria escura"),
          next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Antimatéria")],
         50,
-        ["Alienígenas negociantes", "Distorção temporal"]
+        ["Alienígenas negociantes"]
     )
 ]
 
@@ -417,7 +505,7 @@ def menu_principal(jogador):
         opcoes.append("2. Estação espacial")  # Nova opção adicionada
     opcoes.extend([
         "3. Ver mochila",
-        "4. Vender minérios comerciais",
+        "4. Vender minérios",
         "5. Melhorias",
         "6. Reparar nave",
         "7. Sair do jogo"
@@ -437,9 +525,14 @@ def carregar_jogo():
 
 
 def salvar_jogo(jogador):
-    with open('minerador_save.dat', 'wb') as f:
-        pickle.dump(jogador, f)
-
+    """Salva o progresso do jogador"""
+    try:
+        with open('minerador_save.dat', 'wb') as f:
+            pickle.dump(jogador, f)
+        return True
+    except Exception as e:
+        print(f"⚠️ Erro ao salvar jogo: {e}")
+        return False
 
 def main():
     # Inicialização do jogo
@@ -488,15 +581,28 @@ def main():
 
         # Verifica se a nave foi destruída
         if jogador.nave.dano >= 100:
-            print("\n💥 SUA NAVE FOI DESTRUÍDA!")
-            print("Você perdeu todos os minérios e 50% dos créditos.")
-            jogador.mochila = Mochila()
-            jogador.creditos = int(jogador.creditos * 0.5)
-            jogador.nave.dano = 0
-            jogador.planeta_atual = None
-            jogador.localizacao = "Via Láctea"
+            # Mostra mensagem de game over
+            print("\n\n💥 SUA NAVE FOI DESTRUÍDA! 💥")
+            print("========================================")
+            print("O asteroide reduziu seu veículo a escombros.")
+            print("Seus minérios se perdem no vácuo do espaço...")
+            print("Os sistemas de emergência falharam...")
+            print("\n🚨 FIM DE JOGO 🚨")
             time.sleep(3)
-            continue
+
+            # Remove o arquivo de save para resetar o jogo
+            import os
+            save_file = 'minerador_save.dat'
+
+            if os.path.exists(save_file):
+                try:
+                    os.remove(save_file)
+                    print("\n⚙️ Arquivo de progresso foi resetado.")
+                except Exception as e:
+                    print(f"\n⚠️ Não foi possível resetar o save: {e}")
+
+            time.sleep(2)
+            exit(1)  # Encerra o jogo com código de erro
 
         escolha = menu_principal(jogador)
 
@@ -515,7 +621,10 @@ def main():
                         if minerado > 0:
                             if jogador.mochila.adicionar_mineral(mineral, minerado):
                                 print(f"⛏️ Você minerou {minerado} unidades de {mineral.nome}!")
-                                if jogador.ganhar_experiencia(minerado):
+
+                                # Modifique esta linha (adicione multiplicador):
+                                experiencia_ganha = minerado * 4  # 3x mais experiência que antes
+                                if jogador.ganhar_experiencia(experiencia_ganha):  # Passe o valor calculado
                                     print(f"🎉 Subiu para o nível {jogador.nivel}!")
                             else:
                                 print("⚠️ Mochila cheia! Venda ou descarte alguns itens.")
@@ -527,65 +636,256 @@ def main():
                     print("⚠️ Por favor, digite um número válido!")
                 time.sleep(2)
 
+
+
+
             else:  # Viajar
+
                 mostrar_planetas_disponiveis(jogador)
 
                 try:
-                    opcao = int(input("\nEscolha um planeta para viajar (0 para cancelar): ")) - 1
-                    if opcao == -1:
+
+                    opcao = int(input("\nEscolha um planeta para viajar (0 para cancelar): "))
+
+                    if opcao == 0:
                         continue
 
+                    # Criamos uma lista combinada de planetas disponíveis
+
+                    planetas_disponiveis = []
+
                     if jogador.localizacao == "Via Láctea":
-                        planetas = PLANETAS_VIA_LACTEA
+
+                        planetas_disponiveis.extend(PLANETAS_VIA_LACTEA)
+
+                        # Verifica se Andrômeda já foi descoberta
+
+                        if "Andrômeda Prime" in jogador.planetais_descobertos:
+                            planetas_disponiveis.extend(PLANETAS_INTERGALACTICOS)
+
                     else:
-                        planetas = PLANETAS_INTERGALACTICOS
 
-                    if 0 <= opcao < len(planetas):
-                        planeta = planetas[opcao]
+                        planetas_disponiveis.extend(PLANETAS_INTERGALACTICOS)
 
-                        # Verifica se precisa de motor de dobra para planetas intergalácticos
-                        if jogador.localizacao != "Via Láctea" and not jogador.nave.upgrades["motor_fusao"]:
-                            print("⚠️ Você precisa do Motor de Fusão para viajar entre galáxias!")
-                            time.sleep(2)
-                            continue
+                    # Ajustamos o índice para começar em 1 na exibição
+
+                    if 1 <= opcao <= len(planetas_disponiveis):
+
+                        planeta = planetas_disponiveis[opcao - 1]  # Ajuste do índice
+
+                        # Verificação específica para Andrômeda Prime
+
+                        # Verificação específica para Andrômeda Prime
+                        if planeta.nome == "Andrômeda Prime":
+                            jogador.localizacao = "Galáxia de Andrômeda"  # Atualiza a localização
+                            if not jogador.nave.upgrades.get("motor_fusao"):
+                                print("⚠️ Você precisa do Motor de Fusão para viajar para Andrômeda!")
+                                time.sleep(2)
+                                continue
+
+                            # Acesso CORRETO ao Hélio-3 via dicionário conteudo
+                            helio3 = jogador.mochila.conteudo.get("Hélio-3", 0)
+
+                            if helio3 < 50:
+                                print("⚠️ Você precisa de 50 Hélio-3 para a ignição do motor!")
+                                time.sleep(2)
+                                continue
+
+                            # Atualização CORRETA no dicionário conteudo
+                            jogador.mochila.conteudo["Hélio-3"] = helio3 - 50
+                            print("⚛️ 50 Hélio-3 consumidos para ignição do motor de dobra!")
 
                         custo = planeta.dificuldade / jogador.nave.velocidade
+
                         if jogador.nave.viajar(custo):
+
                             jogador.planeta_atual = planeta
+
                             jogador.planetais_visitados.add(planeta.nome)
+
                             print(f"🛸 Você chegou em {planeta.nome}!")
 
                             if planeta.nome == "Cinturão X-201" and "Andrômeda Prime" not in jogador.planetais_descobertos:
                                 andromeda = next(p for p in PLANETAS_INTERGALACTICOS if p.nome == "Andrômeda Prime")
+
                                 jogador.planetais_descobertos.add(andromeda.nome)
 
                                 print("\n┏" + "━" * 38 + "┓")
+
                                 print("┃  🌟 DESCOBERTA: ANDRÔMEDA PRIME  ┃")
+
                                 print("┗" + "━" * 38 + "┛")
+
                                 print("\nSeus sensores detectaram uma anomalia no cinturão:")
+
                                 print(f"- Portal estável para {andromeda.nome}")
+
                                 print(f"- Coordenadas: X-{random.randint(100, 999)}Y-{random.randint(100, 999)}")
+
                                 print("\n⚡ Requisitos:")
+
                                 print(f"✔ Motor de Dobra ({andromeda.dificuldade} combustível)")
+
                                 print(f"✔ 50 Hélio-3 para ignição")
+
                                 print("\nTransmissão interceptada: \"...roteiro seguro... comerciantes aguardam...\"")
+
                                 print("\n[Enter] para registrar descoberta")
+
                                 input()
+
                                 print(f"✓ {andromeda.nome} disponível para viagem!")
+
                                 time.sleep(2)
 
+
+
                         else:
-                            print("⚠️ Combustível insuficiente para viajar!")
+
+                            # Cena de Game Over quando fica sem combustível
+
+                            print("\n⚠️ Combustível insuficiente para viajar!")
+
+                            time.sleep(2)
+
+                            print("\n\n===========================================")
+
+                            print("  VOCÊ FICOU PRESO NA DERIVA DO ESPAÇO...")
+
+                            print("===========================================")
+
+                            print("\n* Sem combustível, sua nave perde comunicação e energia.")
+
+                            print("* Os minérios coletados flutuam no vácuo, inalcançáveis.")
+
+                            print("* Os alienígenas da Estação Forja Estelar registram seu último sinal:")
+
+                            print("  'Sinal perdido: mais um humano vira estátua de metal no cosmos.'")
+
+                            print("\n💀 FIM DE JOGO 💀")
+
+                            # Deleta o save game de forma robusta
+
+                            import os
+
+                            save_file = 'minerador_save.dat'
+
+                            if os.path.exists(save_file):
+
+                                try:
+
+                                    os.remove(save_file)
+
+                                    print("\n⚙️ Arquivo de progresso foi resetado.")
+
+                                except Exception as e:
+
+                                    print(f"\n⚠️ Não foi possível resetar o save: {e}")
+
+                            time.sleep(3)
+
+                            exit(1)  # Sai com código de erro
+
                     else:
+
                         print("⚠️ Planeta inválido!")
+
                 except ValueError:
+
                     print("⚠️ Por favor, digite um número válido!")
+
                 time.sleep(2)
 
-        elif escolha == "2" and jogador.planeta_atual:  # Viajar para outro planeta
-            jogador.planeta_atual = None
-            print("🚀 Você decolou para o espaço profundo")
-            time.sleep(1)
+
+
+        elif escolha == "2":
+
+            if jogador.planeta_atual:  # Se está em um planeta
+
+                jogador.planeta_atual = None
+
+                print("🚀 Você decolou para o espaço profundo")
+
+                time.sleep(1)
+
+            else:  # Se já está no espaço
+
+                # Menu da Estação Espacial
+
+                print("\n*Docking na Estação Forja Estelar...*")
+
+                print("\"Salve, humano! Recarrego combustível por créditos. O que deseja?\"")
+
+                while True:
+
+                    print(f"\n💰 Seus créditos: {jogador.creditos}")
+
+                    print(f"🔋 Combustível atual: {int(jogador.nave.combustivel)}/{jogador.nave.combustivel_max}")
+
+                    print("\n1. Recarregar 100% combustível (5000 Créditos)")
+
+                    print("2. Recarregar 20% combustível (1000 Créditos)")
+
+                    print("3. Sair da estação")
+
+                    opcao_estacao = input("\nEscolha: ").strip()
+
+                    if opcao_estacao == "1":
+
+                        if jogador.creditos >= 5000:
+
+                            jogador.creditos -= 5000
+
+                            jogador.nave.combustivel = jogador.nave.combustivel_max
+
+                            print(f"\n🔋 Combustível recarregado para 100%! (-5000 créditos)")
+
+                            print(f"💰 Créditos restantes: {jogador.creditos}")
+
+                        else:
+
+                            print(f"\n⚠️ Você precisa de 5000 créditos (você tem: {jogador.creditos})")
+
+                        time.sleep(1.5)
+
+
+                    elif opcao_estacao == "2":
+
+                        if jogador.creditos >= 1000:
+
+                            jogador.creditos -= 1000
+
+                            recarga = jogador.nave.combustivel_max * 0.2
+
+                            jogador.nave.combustivel = min(jogador.nave.combustivel + recarga,
+
+                                                           jogador.nave.combustivel_max)
+
+                            print(f"\n🔋 Combustível recarregado em 20%! (-1000 créditos)")
+
+                            print(f"💰 Créditos restantes: {jogador.creditos}")
+
+                        else:
+
+                            print(f"\n⚠️ Você precisa de 1000 créditos (você tem: {jogador.creditos})")
+
+                        time.sleep(1.5)
+
+
+                    elif opcao_estacao == "3":
+
+                        print("\n*Desacoplando da estação...*")
+
+                        time.sleep(1)
+
+                        break
+
+
+                    else:
+
+                        print("\nOpção inválida!")
+
+                        time.sleep(1)
 
         elif escolha == "3":  # Ver mochila
             while True:
