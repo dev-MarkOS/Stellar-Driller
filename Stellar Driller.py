@@ -106,7 +106,7 @@ class Nave:
         self.capacidade_mineracao = 1
         self.dano = 0  # 0-100, se chegar a 100 a nave é destruída
         self.upgrades = {
-            "motor_fusao": True,
+            "motor_fusao": False,
             "escudo_antimat": False,
             "traje_avancado": False  # Novo upgrade adicionado
         }
