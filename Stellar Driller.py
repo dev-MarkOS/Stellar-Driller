@@ -241,7 +241,7 @@ class Jogador:
     def vender_minerais(self):
         #Vende qualquer tipo de mineral
         if not self.mochila.conteudo:
-            print("⚠️ Mochila vazia! Nada para vender.")
+            print("⚠️ Mochila vazia!")
             return 0
 
         print("\n📦 Minerais disponíveis para venda:")
@@ -440,7 +440,7 @@ def mostrar_mochila(jogador):
 
 
 def mostrar_upgrades(jogador):
-    print("\n=== ⚙️ UPGRADES DISPONÍVEIS ===")
+    print("\n=== ⚙️ MELHORIAS DISPONÍVEIS ===")
     for upgrade_id, dados in UPGRADES_DISPONIVEIS.items():
         status = "✅" if jogador.nave.upgrades[upgrade_id] else "❌"
         print(f"\n{status} {dados['nome_exibicao']}")
@@ -791,7 +791,7 @@ def main():
 
                 print("\n*Docking na Estação Forja Estelar...*")
 
-                print("\"Salve, humano! Recarrego combustível por créditos. O que deseja?\"")
+                print("\"Salve, humano! Recarrego combustível por créditos. De quanto precisa?\"")
 
                 while True:
 
@@ -911,7 +911,7 @@ def main():
             if valor > 0:
                 print(f"💰 Você vendeu minérios por {valor} créditos!")
             else:
-                print("⚠️ Nenhum minério comercial para vender!")
+                print("⚠️ Nenhum minério para vender!")
             time.sleep(2)
 
         elif escolha == "5":  # Melhorias
