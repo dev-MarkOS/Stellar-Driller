@@ -113,7 +113,8 @@ class Nave:
         self.dano = 0  # 0-100, se chegar a 100 a nave é destruída
         self.upgrades = {
             "motor_fusao": True,
-            "escudo_antimat": False
+            "escudo_antimat": False,
+            "traje_avancado": False  # Novo upgrade adicionado
         }
 
     def viajar(self, custo):
@@ -135,33 +136,49 @@ class Nave:
     def reparar(self, quantidade):
         self.dano = max(0, self.dano - quantidade)
 
-    def aplicar_evento(self, evento, jogador):  # Adicione 'jogador' como parâmetro
-        if evento == "Vazamento de O₂" and "Hélio-3" in jogador.mochila.conteudo:
-            qtd_perdida = int(jogador.mochila.conteudo["Hélio-3"] * 0.1)
-            jogador.mochila.remover_mineral("Hélio-3", qtd_perdida)
-            return f"⚠️ Perdeu {qtd_perdida} Hélio-3 no vazamento!"
+    def aplicar_evento(self, evento, jogador):
+        try:
+            if evento == "Falha no Traje":
+                # Verifica se tem upgrade de traje
+                if not self.upgrades.get("traje_avancado", False):
+                    minerios_tecnicos = [m for m in jogador.mochila.conteudo.items()
+                                         if next((min for min in MINERAIS_DISPONIVEIS
+                                                  if min.nome == m[0] and min.tipo == TipoMineral.TECNICO), None)]
+                    if minerios_tecnicos:
+                        total_perdido = 0
+                        for mineral, qtd in minerios_tecnicos:
+                            perdido = max(1, int(qtd * 0.1))
+                            jogador.mochila.remover_mineral(mineral, perdido)
+                            total_perdido += perdido
+                        return f"⚠️ ALERTA! Vazamento no traje. Perdidos {total_perdido} minérios técnicos!"
+                return "Traje espacial intacto (upgrade ativado)"
 
-        elif evento == "Asteroide próximo":
-            if self.upgrades["escudo_antimat"]:
-                return "🛡️ Seus escudos avançados protegeram a nave do asteroide!"
-            else:
-                self.dano += 20
-                return "💥 Asteroide atingiu sua nave! +20% de dano"
-
-        elif evento == "Falha na Nave":
-            if jogador.creditos >= 2000:
-                jogador.creditos -= 2000
-                return "🔧 Você pagou 2.000 créditos para reparar a falha"
-            else:
-                if jogador.mochila.conteudo:
-                    mineral_perdido = random.choice(list(jogador.mochila.conteudo.keys()))
-                    jogador.mochila.remover_mineral(mineral_perdido, 1)
-                    return f"⚠️ Perdeu 1 unidade de {mineral_perdido} devido à falha"
+            elif evento == "Vazamento de O₂":
+                escolha = input("Vazamento detectado! Perder [1] 15% combustível ou [2] 5 Hélio-3? ")
+                if escolha == "2" and jogador.mochila.conteudo.get("Hélio-3", 0) >= 5:
+                    jogador.mochila.remover_mineral("Hélio-3", 5)
+                    return "⚡ Perdeu 5 Hélio-3 para conter vazamento"
                 else:
-                    self.dano += 10
-                    return "⚠️ Falha crítica! +10% de dano na nave"
+                    perdido = int(jogador.nave.combustivel * 0.15)
+                    jogador.nave.combustivel -= perdido
+                    return f"⛽ Perdeu {perdido} combustível no vazamento"
 
-        return None
+            elif evento == "Areia Movediça":
+                print("⏳ Solo instável! Você afundou na areia movediça (20s)...")
+                time.sleep(20)
+                return "✅ Conseguiu se libertar da areia movediça!"
+
+            elif evento == "Asteroide Próximo":
+                if self.upgrades.get("escudo_antimat", False):
+                    return "🛡️ Escudos deflectaram o asteroide!"
+                self.dano = min(self.dano + 20, 100)
+                return "💥 Asteroide atingiu a nave! -20% integridade"
+
+            return f"Evento desconhecido: {evento}"
+
+        except Exception as e:
+            print(f"Erro no evento: {str(e)}")
+            return "⚡ Evento interrompido"
 
 
 class Jogador:
@@ -200,14 +217,11 @@ class Jogador:
     def comprar_upgrade(self, upgrade):
         requisitos = UPGRADES_DISPONIVEIS[upgrade]
 
-        # Verifica créditos
-        if self.creditos < requisitos["creditos"]:
-            return False, "Créditos insuficientes"
-
-        # Verifica recursos
-        for recurso, qtd in requisitos["recursos"].items():
-            if self.mochila.conteudo.get(recurso, 0) < qtd:
-                return False, f"Recurso insuficiente: {recurso}"
+        # Verifica créditos e recursos
+        if (self.creditos < requisitos["creditos"] or
+                any(self.mochila.conteudo.get(recurso, 0) < qtd
+                    for recurso, qtd in requisitos["recursos"].items())):
+            return False, "Recursos insuficientes"
 
         # Deduz custos
         self.creditos -= requisitos["creditos"]
@@ -221,10 +235,16 @@ class Jogador:
         if upgrade == "motor_fusao":
             self.nave.combustivel_max = 150
             self.nave.combustivel = min(self.nave.combustivel, 150)
-        elif upgrade == "broca_laser":
-            self.nave.capacidade_mineracao = 1.5
+            mensagem = "Motor de Dobra Nuclear instalado! Capacidade de combustível aumentada."
 
-        return True, "Upgrade instalado com sucesso!"
+        elif upgrade == "escudo_antimat":
+            self.nave.dano = max(0, self.nave.dano - 10)  # Repara 10% ao instalar
+            mensagem = "Escudo de Antimatéria ativado! Nave reparada em 10%."
+
+        elif upgrade == "traje_avancado":
+            mensagem = "Traje Espacial Mk-II equipado! Proteção contra vazamentos ativada."
+
+        return True, mensagem
 
 
 # Definição de minerais disponíveis
@@ -244,16 +264,23 @@ MINERAIS_DISPONIVEIS = [
 # Definição de upgrades
 UPGRADES_DISPONIVEIS = {
     "motor_fusao": {
-        "nome_exibicao": "⚛️ Motor de Dobra Nuclear",  # Novo campo adicionado
+        "nome_exibicao": "⚛️ Motor de Dobra Nuclear",
         "creditos": 10000,
         "recursos": {"Hélio-3": 50},
-        "descricao": "Permite viagens intergalácticas"  # Descrição original mantida
+        "descricao": "Permite viagens intergalácticas e aumenta tanque de combustível"
     },
     "escudo_antimat": {
-        "nome_exibicao": "✨ Escudo de Antimatéria",  # Novo campo adicionado
+        "nome_exibicao": "🛡️ Escudo de Antimatéria",
         "creditos": 25000,
-        "recursos": {"Dark Matter": 20},
-        "descricao": "Protege contra asteroides"  # Descrição original mantida
+        "recursos": {
+            "Ouro": 20, "Silício": 20},
+        "descricao": "Protege contra asteroides e reduz danos em 50%"
+    },
+    "traje_avancado": {
+        "nome_exibicao": "👨‍🚀 Traje Espacial Mk-II",
+        "creditos": 8000,
+        "recursos": {"Titânio": 20, "Cobre": 15},
+        "descricao": "Previne perda de minérios em eventos de falha no traje"
     }
 }
 
@@ -264,28 +291,28 @@ PLANETAS_VIA_LACTEA = [
         [next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Ferro"),
          next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Silício")],
         10,
-        ["Tempestade de areia", "Falha na Nave"]
+        ["Falha no Traje"]  # Evento único
     ),
     Planeta(
         "Luna-3",
         [next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Titânio"),
          next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Hélio-3")],
         15,
-        ["Vazamento de O₂", "Geiseres de Europa"]
+        ["Vazamento de O₂"]  # Evento único
     ),
     Planeta(
         "Marte Vermelho",
         [next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Ouro"),
          next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Cobre")],
         20,
-        ["Robôs marcianos", "Falha na Nave"]
+        ["Areia Movediça"]  # Evento único
     ),
     Planeta(
         "Cinturão X-201",
         [next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Platina"),
          next(m for m in MINERAIS_DISPONIVEIS if m.nome == "Iridício")],
         30,
-        ["Asteroide próximo", "Meteorito Precioso"]
+        ["Asteroide Próximo"]  # Evento único
     )
 ]
 
@@ -341,12 +368,10 @@ def mostrar_mochila(jogador):
 
 
 def mostrar_upgrades(jogador):
-    print("\n=== ⚙️ MELHORIAS DISPONÍVEIS ===")
-    for upgrade, dados in UPGRADES_DISPONIVEIS.items():
-        status = "✅" if jogador.nave.upgrades[upgrade] else "❌"
-        # Usa nome_exibicao se existir, caso contrário usa a chave do dicionário
-        nome = dados.get("nome_exibicao", upgrade.replace('_', ' ').title())
-        print(f"\n{status} {nome}")
+    print("\n=== ⚙️ UPGRADES DISPONÍVEIS ===")
+    for upgrade_id, dados in UPGRADES_DISPONIVEIS.items():
+        status = "✅" if jogador.nave.upgrades[upgrade_id] else "❌"
+        print(f"\n{status} {dados['nome_exibicao']}")
         print(f"   Preço: {dados['creditos']} créditos")
         print(f"   Recursos: {', '.join([f'{qtd} {nome}' for nome, qtd in dados['recursos'].items()])}")
         print(f"   Efeito: {dados['descricao']}")
@@ -354,33 +379,30 @@ def mostrar_upgrades(jogador):
 
 def mostrar_planetas_disponiveis(jogador):
     print("\n=== 🌠 PLANETAS DISPONÍVEIS ===")
+    planetas_disponiveis = []
 
-    # Determina se estamos na Via Láctea ou em outra galáxia
-    if jogador.localizacao == "Via Láctea":
-        planetas_base = PLANETAS_VIA_LACTEA
-        planetas_especiais = [p for p in PLANETAS_INTERGALACTICOS
-                              if p.nome in jogador.planetais_descobertos and
-                              jogador.nave.upgrades.get("motor_fusao", True)]
-        planetas = planetas_base + planetas_especiais
-    else:
-        planetas = PLANETAS_INTERGALACTICOS
-
-    # Mostra todos os planetas disponíveis
-    for i, planeta in enumerate(planetas, start=1):
+    # Planetas da Via Láctea (sempre visíveis)
+    for i, planeta in enumerate(PLANETAS_VIA_LACTEA, start=1):
+        planetas_disponiveis.append(planeta)
         custo = int(planeta.dificuldade / jogador.nave.velocidade)
         print(f"{i}. {planeta.nome} - ⛽ Custo: {custo}")
-
         if planeta.nome in jogador.planetais_visitados:
             minerais = [f"{m.icon} {m.nome}" for m in planeta.minerais]
             print(f"   Minérios: {' e '.join(minerais)}")
 
-    # Mensagem sobre destinos bloqueados
-    if (jogador.localizacao == "Via Láctea" and
-            any(p.nome in jogador.planetais_descobertos and
-                not jogador.nave.upgrades.get("motor_fusao", False)
-                for p in PLANETAS_INTERGALACTICOS)):
-        print("\nℹ️ Você tem destinos descobertos que precisam do Motor de Dobra!")
+    # Planetas intergalácticos (requerem motor de dobra)
+    if jogador.nave.upgrades.get("motor_fusao", False):
+        for j, planeta in enumerate(PLANETAS_INTERGALACTICOS, start=len(PLANETAS_VIA_LACTEA) + 1):
+            if planeta.nome in jogador.planetais_descobertos:
+                planetas_disponiveis.append(planeta)
+                custo = int(planeta.dificuldade / jogador.nave.velocidade)
+                print(f"{j}. {planeta.nome} - ⛽ Custo: {custo}")
+                print(f"   Requisitos: 50 Hélio-3 para ignição do motor")
+                if planeta.nome in jogador.planetais_visitados:
+                    minerais = [f"{m.icon} {m.nome}" for m in planeta.minerais]
+                    print(f"   Minérios: {' e '.join(minerais)}")
 
+    return planetas_disponiveis
 
 def menu_principal(jogador):
     print("\n📜 MENU PRINCIPAL")
@@ -392,7 +414,7 @@ def menu_principal(jogador):
         opcoes.append("2. Viajar para outro planeta")
     else:
         opcoes.append("1. Viajar para um planeta")
-
+        opcoes.append("2. Estação espacial")  # Nova opção adicionada
     opcoes.extend([
         "3. Ver mochila",
         "4. Vender minérios comerciais",
@@ -403,6 +425,7 @@ def menu_principal(jogador):
 
     print("\n".join(opcoes))
     return input("\nEscolha uma ação: ")
+
 
 
 def carregar_jogo():
@@ -442,12 +465,26 @@ def main():
             evento = jogador.planeta_atual.verificar_evento()
             if evento:
                 print(f"\n⚠️ EVENTO: {evento}!")
-                resultado = jogador.nave.aplicar_evento(evento)
+                resultado = jogador.nave.aplicar_evento(evento, jogador)  # Passando jogador
                 if resultado:
                     print(resultado)
                 time.sleep(2)
 
             jogador.planeta_atual.atualizar_evento()
+
+            def verificar_evento_especial_cinturao(jogador, chegada=True):
+                if jogador.planeta_atual and jogador.planeta_atual.nome == "Cinturão X-201":
+                    if random.random() < 0.25:  # 25% de chance
+                        resultado = jogador.nave.aplicar_evento("Asteroide Próximo", jogador)
+                        print(f"\n{'CHEGADA' if chegada else 'SAÍDA'} NO CINTURÃO X-201")
+                        print(resultado)
+                        time.sleep(2)
+
+            # Chamar quando chegar:
+            verificar_evento_especial_cinturao(jogador, chegada=True)
+
+            # Chamar quando sair:
+            verificar_evento_especial_cinturao(jogador, chegada=False)
 
         # Verifica se a nave foi destruída
         if jogador.nave.dano >= 100:
