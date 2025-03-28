@@ -509,7 +509,7 @@ def menu_principal(jogador):
         "4. Vender minérios",
         "5. Melhorias",
         "6. Reparar nave",
-        "7. Sair do jogo"
+        "7. Salvar e sair do jogo"
     ])
 
     print("\n".join(opcoes))
@@ -1086,7 +1086,7 @@ def main():
                     print("⚠️ Créditos insuficientes!")
             time.sleep(2)
 
-        elif escolha == "7":  # Sair
+        elif escolha == "7":  # Salvar e sair
             salvar_jogo(jogador)
             print("🚀 Progresso salvo. Até a próxima, comandante!")
             break
