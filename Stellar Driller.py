@@ -141,7 +141,7 @@ class Nave:
         return False
 
     def estacao_espacial(jogador):
-        print("\n*Docking na Estação Forja Estelar...*")
+        print("\n*Atracando na Estação Forja Estelar...*")
         print("\"Salve, humano! Recarrego combustível por créditos. De quanto precisa?\"")
         print("\"Se tiver interesse também estou vendendo meu curso de comércio interestelar criativo.\"")
 
@@ -551,7 +551,7 @@ def main():
         jogador.planetais_descobertos.update(p.nome for p in PLANETAS_HELIOS_REACH)
         print("\n🌌 Bem-vindo à Helios Reach,comandante!")
         print("Explore planetas, colete minérios e melhore sua nave.")
-        print("Use os créditos para comprar melhorias e desbloquear novos setores da galáxia!")
+        print("Use os créditos para comprar melhorias e desbloquear novos horizontes da galáxia!")
         time.sleep(3)
 
     # Início do loop
@@ -882,7 +882,7 @@ def main():
 
                 # Menu da Estação Espacial
 
-                print("\n*Docking na Estação Forja Estelar...*")
+                print("\n*Atracando na Estação Forja Estelar...*")
 
                 print("\"Salve, humano! Recarrego combustível por créditos. De quanto precisa?\"")
 
