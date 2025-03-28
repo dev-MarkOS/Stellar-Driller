@@ -41,7 +41,7 @@ class Planeta:
             if tempo_decorrido >= 1:
                 segundos_passados = int(tempo_decorrido)
                 self.tempo_evento = max(0, self.tempo_evento - segundos_passados)
-                self.ultima_atualizacao = agora  # Reinicia o contador
+                self.ultima_atualizacao = agora
 
                 if self.tempo_evento <= 0:
                     self.evento_ativo = None
@@ -95,16 +95,12 @@ class Nave:
         self.capacidade_mineracao = 1
         self.dano = 0  # 0-100, se chegar a 100 a nave é destruída
         self.upgrades = {
-            "motor_fusao": True, #Necessário para ir até Andrômeda
+            "motor_fusao": False, #Necessário para ir até Andrômeda
             "escudo_antimat": False,
             "traje_avancado": False
         }
 
     def minerar(self, planeta, mineral_alvo):
-        """
-        Método unificado de mineração - versão simplificada
-        Retorna a quantidade minerada (0 se falhar)
-        """
         # Verificações de segurança
         if not hasattr(planeta, 'riqueza') or mineral_alvo.nome not in planeta.riqueza:
             return 0
@@ -115,7 +111,7 @@ class Nave:
 
         # Cálculo da quantidade
         try:
-            base = random.randint(10, 20)
+            base = random.randint(5, 15)
             quantidade = base * self.capacidade_mineracao
 
             # Aplica efeitos de eventos
@@ -126,7 +122,7 @@ class Nave:
             quantidade = min(quantidade, planeta.riqueza[mineral_alvo.nome])
             planeta.riqueza[mineral_alvo.nome] -= quantidade
 
-            # Mensagem única simplificada
+            # Mensagem de minério esgotado
             if quantidade > 0:
                 print(f"⛏️ Você minerou {quantidade} unidades de {mineral_alvo.nome}!")
                 if planeta.riqueza[mineral_alvo.nome] <= 0:
@@ -147,6 +143,7 @@ class Nave:
     def estacao_espacial(jogador):
         print("\n*Docking na Estação Forja Estelar...*")
         print("\"Salve, humano! Recarrego combustível por créditos. De quanto precisa?\"")
+        print("\"Se tiver interesse também estou vendendo meu curso de comércio interestelar criativo.\"")
 
         while True:
             print(f"\n💰 Seus créditos: {jogador.creditos}")
@@ -220,7 +217,7 @@ class Nave:
                     return f"⛽ Perdeu {perdido} combustível no vazamento"
 
             elif evento == "Areia Movediça":
-                print("⏳ Solo instável! Você afundou na areia movediça (20s)...")
+                print("⏳ Tá ficando atoladinho! Você afundou na areia movediça (20s)...")
                 time.sleep(20)
                 return "✅ Conseguiu se libertar da areia movediça!"
 
@@ -340,6 +337,7 @@ class Jogador:
 #---------------------------------------------------------------------------------------------
 
 # Definição da lógica do jogo (2/3)
+
 MINERAIS_DISPONIVEIS = [
     Mineral("Ferro", 35, "🔩"),
     Mineral("Silício", 40, "🔧"),
@@ -495,7 +493,6 @@ def mostrar_planetas_disponiveis(jogador):
 
     return planetas_disponiveis
 
-
 def menu_principal(jogador):
     print("\n📜 MENU PRINCIPAL")
 
@@ -650,6 +647,7 @@ def main():
                 time.sleep(2)
 
 
+
             else:  # Viajar
 
                 mostrar_planetas_disponiveis(jogador)
@@ -661,56 +659,129 @@ def main():
                     if opcao == 0:
                         continue
 
+                    # Determinar planetas disponíveis
+
                     planetas_disponiveis = []
 
                     if jogador.localizacao == "Helios Reach":
 
                         planetas_disponiveis.extend(PLANETAS_HELIOS_REACH)
 
-                        # Verifica se Andrômeda já foi descoberta
-
                         if "Andrômeda Prime" in jogador.planetais_descobertos:
                             planetas_disponiveis.extend(PLANETAS_INTERGALACTICOS)
 
-                    else:
+                    else:  # Se estiver em Andrômeda
 
-                        planetas_disponiveis.extend(PLANETAS_INTERGALACTICOS)
+                        # Ao voltar, mostra os planetas de Helios Reach como destinos
+
+                        planetas_disponiveis.extend(PLANETAS_HELIOS_REACH)
 
                     if 1 <= opcao <= len(planetas_disponiveis):
 
                         planeta = planetas_disponiveis[opcao - 1]
 
-                        if planeta.nome == "Andrômeda Prime":
-                            # Primeiro verifica todos os requisitos ANTES de atualizar a localização
+                        # Viagem de volta para Helios Reach
+
+                        if jogador.localizacao == "Galáxia de Andrômeda":
+
+                            # Verifica requisitos para voltar
+
+                            helio3 = jogador.mochila.conteudo.get("Hélio-3", 0)
+
+                            if helio3 < 50:
+                                print("⚠️ Você precisa de 50 Hélio-3 para voltar a Helios Reach!")
+
+                                time.sleep(2)
+
+                                continue
+
+                            custo = planeta.dificuldade / jogador.nave.velocidade
+
+                            if not jogador.nave.viajar(custo):
+                                print("⚠️ Combustível insuficiente para esta viagem!")
+
+                                time.sleep(2)
+
+                                continue
+
+                            # Consome recursos e atualiza localização
+
+                            jogador.mochila.conteudo["Hélio-3"] = helio3 - 50
+
+                            jogador.localizacao = "Helios Reach"
+
+                            jogador.planeta_atual = planeta  # Atualiza para o planeta selecionado
+
+                            jogador.planetais_visitados.add(planeta.nome)
+
+                            print("⚛️ 50 Hélio-3 consumidos para retornar a Helios Reach!")
+
+                            print(f"🛸 Você chegou em {planeta.nome}!")
+
+                            time.sleep(2)
+
+                            continue
+
+
+                        # --- Viagem para Andrômeda Prime ---
+
+                        elif planeta.nome == "Andrômeda Prime":
+
                             if not jogador.nave.upgrades.get("motor_fusao"):
                                 print("⚠️ Você precisa do Motor de Fusão para viajar para Andrômeda!")
+
                                 time.sleep(2)
+
                                 continue
 
                             helio3 = jogador.mochila.conteudo.get("Hélio-3", 0)
+
                             if helio3 < 50:
                                 print("⚠️ Você precisa de 50 Hélio-3 para a ignição do motor!")
+
                                 time.sleep(2)
+
                                 continue
 
-                            # Só atualiza a localização SE todos os requisitos forem atendidos
-                            jogador.localizacao = "Galáxia de Andrômeda"
+                            custo = planeta.dificuldade / jogador.nave.velocidade
+
+                            if not jogador.nave.viajar(custo):
+                                print("⚠️ Combustível insuficiente para esta viagem!")
+
+                                time.sleep(2)
+
+                                continue
+
+                            # Consome recursos e atualiza localização
+
                             jogador.mochila.conteudo["Hélio-3"] = helio3 - 50
+
+                            jogador.localizacao = "Galáxia de Andrômeda"
+
+                            jogador.planeta_atual = planeta  # Andrômeda Prime
+
+                            jogador.planetais_visitados.add(planeta.nome)
+
                             print("⚛️ 50 Hélio-3 consumidos para ignição do motor de dobra!")
+
+                            print(f"🛸 Você chegou em {planeta.nome}!")
+
+                            time.sleep(2)
+
+                            continue
+
+                        # --- Viagem normal dentro da mesma galáxia ---
 
                         custo = planeta.dificuldade / jogador.nave.velocidade
 
-                        if jogador.nave.viajar(custo):
-
+                        if jogador.nave.viajar(custo):  # Se conseguiu viajar
                             jogador.planeta_atual = planeta
-
                             jogador.planetais_visitados.add(planeta.nome)
 
                             print(f"🛸 Você chegou em {planeta.nome}!")
 
                             if planeta.nome == "Cinturão X-201" and "Andrômeda Prime" not in jogador.planetais_descobertos:
                                 andromeda = next(p for p in PLANETAS_INTERGALACTICOS if p.nome == "Andrômeda Prime")
-
                                 jogador.planetais_descobertos.add(andromeda.nome)
 
                                 print("\n┏" + "━" * 38 + "┓")
@@ -740,8 +811,6 @@ def main():
                                 print(f"✓ {andromeda.nome} disponível para viagem!")
 
                                 time.sleep(2)
-
-
 
                         else:
 
@@ -799,8 +868,6 @@ def main():
 
                 time.sleep(2)
 
-
-
         elif escolha == "2":
 
             if jogador.planeta_atual:  # Se está em um planeta
@@ -818,6 +885,8 @@ def main():
                 print("\n*Docking na Estação Forja Estelar...*")
 
                 print("\"Salve, humano! Recarrego combustível por créditos. De quanto precisa?\"")
+
+                print("\"Se tiver interesse também estou vendendo meu curso de comércio interestelar criativo.\"")
 
                 while True:
 
@@ -851,7 +920,6 @@ def main():
 
                         time.sleep(1.5)
 
-
                     elif opcao_estacao == "2":
 
                         if jogador.creditos >= 1000:
@@ -874,7 +942,6 @@ def main():
 
                         time.sleep(1.5)
 
-
                     elif opcao_estacao == "3":
 
                         print("\n*Desacoplando da estação...*")
@@ -882,7 +949,6 @@ def main():
                         time.sleep(1)
 
                         break
-
 
                     else:
 
@@ -1028,7 +1094,6 @@ def main():
         else:
             print("⚠️ Opção inválida!")
             time.sleep(1)
-
 
 if __name__ == "__main__":
     main()
