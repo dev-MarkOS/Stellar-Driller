@@ -3,6 +3,7 @@ import os
 import random
 import pickle
 from enum import Enum
+from datetime import datetime, timedelta
 
 # Definição das classes (1/3)
 class Mineral:
@@ -17,37 +18,33 @@ class Planeta:
         self.minerais = minerais
         self.dificuldade = dificuldade
         self.eventos = eventos
-        self.riqueza = {mineral.nome: random.randint(50, 150) for mineral in minerais}
+        self.riqueza = {mineral.nome: random.randint(100, 250) for mineral in minerais}
         self.evento_ativo = None
         self.tempo_evento = 0
-
-    def minerar(self, mineral_alvo):
-        if self.riqueza[mineral_alvo.nome] <= 0:
-            return 0
-
-        base_minerado = random.randint(3, 8)
-
-        # Aplica efeito de evento
-        if self.evento_ativo == "Tempestade de areia":
-            base_minerado = int(base_minerado * 0.7)  # Redução de 30% na mineração
-
-        minerado = min(base_minerado, self.riqueza[mineral_alvo.nome])
-        self.riqueza[mineral_alvo.nome] -= minerado
-        return minerado
+        self.ultima_atualizacao = time.time()  # Novo atributo para controlar o tempo
 
     def verificar_evento(self):
         # 20% de chance de um evento ocorrer
         if random.random() < 0.2 and not self.evento_ativo:
             self.evento_ativo = random.choice(self.eventos)
             self.tempo_evento = 30  # 30 segundos
+            self.ultima_atualizacao = time.time()  # Registra o momento do início
             return self.evento_ativo
         return None
 
     def atualizar_evento(self):
         if self.evento_ativo and self.tempo_evento > 0:
-            self.tempo_evento -= 1
-            if self.tempo_evento <= 0:
-                self.evento_ativo = None
+            agora = time.time()
+            tempo_decorrido = agora - self.ultima_atualizacao
+
+            # Só atualiza se passou pelo menos 1 segundo
+            if tempo_decorrido >= 1:
+                segundos_passados = int(tempo_decorrido)
+                self.tempo_evento = max(0, self.tempo_evento - segundos_passados)
+                self.ultima_atualizacao = agora  # Reinicia o contador
+
+                if self.tempo_evento <= 0:
+                    self.evento_ativo = None
 
 class Mochila:
     def __init__(self, capacidade=500):
@@ -98,10 +95,47 @@ class Nave:
         self.capacidade_mineracao = 1
         self.dano = 0  # 0-100, se chegar a 100 a nave é destruída
         self.upgrades = {
-            "motor_fusao": False, #Necessário para ir até Andrômeda
+            "motor_fusao": True, #Necessário para ir até Andrômeda
             "escudo_antimat": False,
             "traje_avancado": False
         }
+
+    def minerar(self, planeta, mineral_alvo):
+        """
+        Método unificado de mineração - versão simplificada
+        Retorna a quantidade minerada (0 se falhar)
+        """
+        # Verificações de segurança
+        if not hasattr(planeta, 'riqueza') or mineral_alvo.nome not in planeta.riqueza:
+            return 0
+
+        if planeta.riqueza[mineral_alvo.nome] <= 0:
+            print(f"⚠️ {mineral_alvo.nome} esgotado!")
+            return 0
+
+        # Cálculo da quantidade
+        try:
+            base = random.randint(10, 20)
+            quantidade = base * self.capacidade_mineracao
+
+            # Aplica efeitos de eventos
+            if hasattr(planeta, 'evento_ativo') and planeta.evento_ativo == "Tempestade de areia":
+                quantidade = int(quantidade * 0.7)
+
+            # Garante não ultrapassar o disponível
+            quantidade = min(quantidade, planeta.riqueza[mineral_alvo.nome])
+            planeta.riqueza[mineral_alvo.nome] -= quantidade
+
+            # Mensagem única simplificada
+            if quantidade > 0:
+                print(f"⛏️ Você minerou {quantidade} unidades de {mineral_alvo.nome}!")
+                if planeta.riqueza[mineral_alvo.nome] <= 0:
+                    print(f"⚡ {mineral_alvo.nome} esgotado!")
+
+            return quantidade
+
+        except Exception:
+            return 0
 
     def viajar(self, custo):
         custo_ajustado = custo / self.velocidade
@@ -156,21 +190,6 @@ class Nave:
             else:
                 print("\nOpção inválida!")
                 time.sleep(1)
-
-    def minerar(self, planeta, mineral_alvo):
-        # Verifica se o mineral existe e tem recursos disponíveis
-        if mineral_alvo.nome not in planeta.riqueza or planeta.riqueza[mineral_alvo.nome] <= 0:
-            print(f"⚠️ {mineral_alvo.nome} esgotado ou não encontrado neste planeta!")
-            return 0
-
-        # Calcula quantidade minerada
-        base_minerado = random.randint(3, 8)
-        quantidade = int(base_minerado * self.capacidade_mineracao)
-
-        # Atualiza os recursos do planeta
-        planeta.riqueza[mineral_alvo.nome] -= quantidade
-
-        return quantidade
 
     def reparar(self, quantidade):
         self.dano = max(0, self.dano - quantidade)
@@ -338,13 +357,13 @@ MINERAIS_DISPONIVEIS = [
 UPGRADES_DISPONIVEIS = {
     "motor_fusao": {
         "nome_exibicao": "⚛️ Motor de Dobra Nuclear",
-        "creditos": 10000,
+        "creditos": 16000,
         "recursos": {"Hélio-3": 50},
         "descricao": "Permite viagens intergalácticas e aumenta tanque de combustível"
     },
     "escudo_antimat": {
         "nome_exibicao": "🛡️ Escudo de Antimatéria",
-        "creditos": 25000,
+        "creditos": 12000,
         "recursos": {
             "Ouro": 20, "Silício": 20},
         "descricao": "Protege contra asteroides e reduz danos em 50%"
@@ -542,8 +561,8 @@ def main():
     while True:
         mostrar_status(jogador)
 
-        # Verifica eventos no planeta atual
         if jogador.planeta_atual:
+            # Verifica se um novo evento deve ocorrer
             evento = jogador.planeta_atual.verificar_evento()
             if evento:
                 print(f"\n⚠️ EVENTO: {evento}!")
@@ -552,7 +571,14 @@ def main():
                     print(resultado)
                 time.sleep(2)
 
+            # Atualiza o contador do evento atual
             jogador.planeta_atual.atualizar_evento()
+
+            if jogador.planeta_atual.nome == "Cinturão X-201":
+                if random.random() < 0.25:  # 25% de chance
+                    resultado = jogador.nave.aplicar_evento("Asteroide Próximo", jogador)
+                    print(resultado)
+                    time.sleep(2)
 
             def verificar_evento_especial_cinturao(jogador, chegada=True):
                 if jogador.planeta_atual and jogador.planeta_atual.nome == "Cinturão X-201":
@@ -609,15 +635,14 @@ def main():
 
                         if minerado > 0:
                             if jogador.mochila.adicionar_mineral(mineral, minerado):
-                                print(f"⛏️ Você minerou {minerado} unidades de {mineral.nome}!")
 
-                                experiencia_ganha = minerado * 4  # 4x mais experiência que antes, para melhor progresso
+                                experiencia_ganha = minerado * 3  # 3x mais experiência que antes, para melhor progresso
                                 if jogador.ganhar_experiencia(experiencia_ganha):
                                     print(f"🎉 Subiu para o nível {jogador.nivel}!")
                             else:
                                 print("⚠️ Mochila cheia! Venda ou descarte alguns itens.")
                         else:
-                            print("⚠️ Falha na mineração (sem combustível ou recursos esgotados)")
+                            print("⚠️ Falha na mineração")
                     else:
                         print("⚠️ Opção inválida!")
                 except ValueError:
@@ -656,19 +681,20 @@ def main():
                         planeta = planetas_disponiveis[opcao - 1]
 
                         if planeta.nome == "Andrômeda Prime":
-                            jogador.localizacao = "Galáxia de Andrômeda"  # Atualiza a localização
+                            # Primeiro verifica todos os requisitos ANTES de atualizar a localização
                             if not jogador.nave.upgrades.get("motor_fusao"):
                                 print("⚠️ Você precisa do Motor de Fusão para viajar para Andrômeda!")
                                 time.sleep(2)
                                 continue
 
                             helio3 = jogador.mochila.conteudo.get("Hélio-3", 0)
-
                             if helio3 < 50:
                                 print("⚠️ Você precisa de 50 Hélio-3 para a ignição do motor!")
                                 time.sleep(2)
                                 continue
 
+                            # Só atualiza a localização SE todos os requisitos forem atendidos
+                            jogador.localizacao = "Galáxia de Andrômeda"
                             jogador.mochila.conteudo["Hélio-3"] = helio3 - 50
                             print("⚛️ 50 Hélio-3 consumidos para ignição do motor de dobra!")
 
@@ -914,48 +940,65 @@ def main():
                 print("⚠️ Nenhum minério para vender!")
             time.sleep(2)
 
+
         elif escolha == "5":  # Melhorias
+
             while True:
+
                 mostrar_upgrades(jogador)
+
                 print("\n1. Voltar")
+
                 print("2. Comprar melhoria")
 
                 opcao = input("Escolha uma ação: ")
+
                 if opcao == "1":
+
                     break
+
                 elif opcao == "2":
+
                     upgrades_disponiveis = [up for up in UPGRADES_DISPONIVEIS if not jogador.nave.upgrades[up]]
+
                     if not upgrades_disponiveis:
                         print("⚠️ Todos os upgrades já foram comprados!")
+
                         time.sleep(1)
+
                         continue
 
                     print("\nMelhorias disponíveis para compra:")
-                    for i, upgrade in enumerate(upgrades_disponiveis):
-                        print(f"{i + 1}. {upgrade.replace('_', ' ').title()}")
+
+                    for i, upgrade_id in enumerate(upgrades_disponiveis, 1):
+                        dados_upgrade = UPGRADES_DISPONIVEIS[upgrade_id]
+
+                        print(f"{i}. {dados_upgrade['nome_exibicao']} - {dados_upgrade['creditos']} créditos")
 
                     try:
+
                         opcao_up = int(input("Escolha o upgrade para comprar (0 para cancelar): ")) - 1
+
                         if opcao_up == -1:
                             continue
 
                         if 0 <= opcao_up < len(upgrades_disponiveis):
-                            upgrade = upgrades_disponiveis[opcao_up]
-                            sucesso, mensagem = jogador.comprar_upgrade(upgrade)
+
+                            upgrade_id = upgrades_disponiveis[opcao_up]
+
+                            sucesso, mensagem = jogador.comprar_upgrade(upgrade_id)
+
                             print(mensagem)
 
-                            # Se comprou motor de fusão, pode viajar para outras galáxias
-                            if sucesso and upgrade == "motor_fusao":
-                                jogador.localizacao = "Andrômeda"
-                                print("🌠 Motor de Fusão instalado! Agora você pode viajar para outras galáxias!")
                         else:
+
                             print("⚠️ Opção inválida!")
+
                     except ValueError:
+
                         print("⚠️ Por favor, digite um número válido!")
+
                     time.sleep(2)
-                else:
-                    print("⚠️ Opção inválida!")
-                    time.sleep(1)
 
         elif escolha == "6":  # Reparar nave
             custo = jogador.nave.dano * 50
