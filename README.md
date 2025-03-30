@@ -1,4 +1,5 @@
 # 🚀 Stellar Driller - Mineração Espacial
+Jogo em fase alpha!
 
 **Stellar Driller** é um jogo de aventura espacial em Python que combina exploração intergaláctica, mineração de recursos e gerenciamento estratégico.
 
